@@ -1,1 +1,182 @@
-TEST
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Technical Image Annotation</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+      margin: 0;
+    }
+
+    #instruction {
+      font-size: 1.1rem;
+      text-align: center;
+      max-width: 60ch;
+    }
+
+    #container {
+      position: relative;
+      display: inline-block;
+      user-select: none;
+    }
+
+    #photo {
+      max-width: 80vw;
+      height: auto;
+      display: block;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none; /* clicks fall through to #container */
+    }
+
+    #doneBtn {
+      padding: 0.5rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      background: dodgerblue;
+      color: #fff;
+      transition: background 0.3s;
+    }
+
+    #doneBtn:hover { background: royalblue; }
+  </style>
+</head>
+<body>
+  <h1>Image Annotation Demo</h1>
+  <div id="instruction"></div>
+
+  <div id="container">
+    <img id="photo" src="" alt="Current technical image" />
+    <svg id="overlay"></svg>
+  </div>
+
+  <button id="doneBtn">Done</button>
+
+  <script>
+    // ============== CONFIG (edit these) ============== //
+    // 1. Put your images in the repo folder  /images  and list their file names here *in the order you want to show them*.
+    const imageFiles = [
+      "machine1.png",
+      "machine2.png",
+      // "machine3.jpg",
+    ].sort(); // remove .sort() if you want to keep manual order strictly
+
+    // 2. Provide one instruction string per image, keeping the same order.
+    const instructions = [
+      "Click on the 4 silver screws around the black dial",
+      "Click on the 2 inlet valves",
+      // "Your next instruction here",
+    ];
+
+    // ======== DO NOT EDIT BELOW UNLESS YOU KNOW WHAT YOU'RE DOING ======== //
+
+    if (imageFiles.length !== instructions.length) {
+      alert("❌ The number of images and instructions doesn’t match. Please fix the arrays in index.html.");
+      throw new Error("Image / instruction count mismatch");
+    }
+
+    const images = imageFiles.map((file, i) => ({
+      src: `images/${file}`,
+      instruction: instructions[i] || "",
+    }));
+
+    let current = 0;
+    const annotations = [];
+
+    const img   = document.getElementById("photo");
+    const svg   = document.getElementById("overlay");
+    const instr = document.getElementById("instruction");
+    const cont  = document.getElementById("container");
+    const btn   = document.getElementById("doneBtn");
+
+    // ensure arrow marker exists once
+    function ensureArrowMarker() {
+      if (document.getElementById("arrowhead")) return;
+      const defs   = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+      marker.id       = "arrowhead";
+      marker.markerWidth  = 6;
+      marker.markerHeight = 6;
+      marker.refX = 5;
+      marker.refY = 3;
+      marker.setAttribute("orient", "auto");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M0 0 L6 3 L0 6 Z");
+      path.setAttribute("fill", "red");
+      marker.appendChild(path);
+      defs.appendChild(marker);
+      svg.appendChild(defs);
+    }
+
+    function fitOverlay() {
+      svg.setAttribute("width", img.clientWidth);
+      svg.setAttribute("height", img.clientHeight);
+    }
+
+    function load(index) {
+      const { src, instruction } = images[index];
+      img.src = src;
+      instr.textContent = instruction;
+      svg.innerHTML = "";
+      img.onload = () => {
+        fitOverlay();
+      };
+    }
+
+    function addArrow(x, y) {
+      ensureArrowMarker();
+      const len = 20;
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x - len);
+      line.setAttribute("y1", y - len);
+      line.setAttribute("x2", x);
+      line.setAttribute("y2", y);
+      line.setAttribute("stroke", "red");
+      line.setAttribute("stroke-width", 2);
+      line.setAttribute("marker-end", "url(#arrowhead)");
+      svg.appendChild(line);
+    }
+
+    cont.addEventListener("click", (e) => {
+      const rect = img.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      addArrow(x, y);
+      (annotations[current] ||= []).push({ x, y });
+    });
+
+    btn.addEventListener("click", () => {
+      if (current < images.length - 1) {
+        current++;
+        load(current);
+      } else {
+        const blob = new Blob([JSON.stringify(annotations, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "annotations.json";
+        a.click();
+        alert("All images annotated ✔️");
+      }
+    });
+
+    window.addEventListener("resize", fitOverlay);
+
+    load(current);
+  </script>
+</body>
+</html>
